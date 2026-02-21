@@ -44,8 +44,24 @@ function setupCache(config = {}) {
         invalidationOrder,
         filterFn = obscureQueryParameterValues
       } = reqConfig;
-      const needObservation = document?.cacheDictionary[filterFn(req.url)] || document?.cacheDictionary[req.url];
-      debug('observation filter from library', req.url)
+      let strippedUrl = req.url;
+      const storeHosts = config?.store?.host;
+      if (Array.isArray(storeHosts)) {
+        for (const host of storeHosts) {
+          if (strippedUrl.startsWith(host)) {
+            strippedUrl = strippedUrl.replace(host, '');
+            break;
+          }
+        }
+      }
+      // Re-attach the primary host so the proxy can do its expected host-stripping
+      // (avoids the proxy wrapping arrays in a broken object-proxy)
+      const normalizedUrl = strippedUrl !== req.url && config.host
+        ? config.host + strippedUrl
+        : req.url;
+      const needObservation = document?.cacheDictionary[filterFn(normalizedUrl)]
+        || document?.cacheDictionary[normalizedUrl];
+      debug('observation filter from library', req.url);
       if (isFunction(observable)) {
         observable(config, { ...req, url: req?.url?.replace(config.host, '') || "" }, res);
       }
